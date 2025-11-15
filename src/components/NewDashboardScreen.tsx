@@ -1,3 +1,4 @@
+import React from "react";
 import { useState } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -5,7 +6,7 @@ import { Progress } from "./ui/progress";
 import { Input } from "./ui/input";
 import { TrendingDown, TrendingUp, Plus, Calendar, Bell } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "recharts";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 interface Event {
   name: string;

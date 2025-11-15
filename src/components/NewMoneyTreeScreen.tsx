@@ -1,3 +1,4 @@
+import React from "react";
 import { useState } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -6,7 +7,7 @@ import { Progress } from "./ui/progress";
 import { Input } from "./ui/input";
 import { Sprout, TrendingUp, Target, Trophy, Users, MessageCircle, UserPlus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 interface LeaderboardUser {
   username: string;
