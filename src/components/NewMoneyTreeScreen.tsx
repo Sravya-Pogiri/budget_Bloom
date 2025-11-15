@@ -1,12 +1,15 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 import { Sprout, TrendingUp, Target, Trophy, Users, MessageCircle, UserPlus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
+// Import the useRive hook (RiveState is implied by the hook's return)
+import { useRive } from "@rive-app/react-canvas"; 
 
 interface LeaderboardUser {
   username: string;
@@ -19,6 +22,37 @@ interface LeaderboardUser {
 export function NewMoneyTreeScreen() {
   const [friendUsername, setFriendUsername] = useState("");
   const [message, setMessage] = useState("");
+  
+  // State for controlling the Rive animation
+  const [animationLevel, setAnimationLevel] = useState(0);
+
+  // 1. Destructure ONLY RiveComponent and rive
+  const { RiveComponent, rive } = useRive({
+    src: "/Tree.riv", // Path to your Rive file in the /public folder
+    stateMachines: "State Machine 1", // From your .riv file
+    artboard: "Artboard", // From your .riv file
+    autoplay: true,
+  });
+
+  // 2. Correctly access inputs via the stateMachineInputs() method
+  useEffect(() => {
+    if (rive) {
+      // Get the inputs for "State Machine 1"
+      const inputs = rive.stateMachineInputs("State Machine 1");
+      
+      if (inputs) {
+        // Find the "Numgrowing" input by its name
+        const numGrowingInput = inputs.find(
+          (input) => input.name === "Numgrowing"
+        );
+        
+        // If found, set its value
+        if (numGrowingInput) {
+          numGrowingInput.value = animationLevel;
+        }
+      }
+    }
+  }, [rive, animationLevel]); // Rerun effect when rive or animationLevel changes
 
   const treeLevel = {
     level: 4,
@@ -79,7 +113,11 @@ export function NewMoneyTreeScreen() {
           </div>
 
           <div className="text-center mb-6">
-            <div className="text-8xl mb-3">🌳</div>
+            {/* Rive animation */}
+            <div className="w-full h-64 mx-auto mb-3">
+              <RiveComponent />
+            </div>
+
             <h3 className="text-gray-900 mb-1">{treeLevel.stage}</h3>
             <p className="text-sm text-gray-600">Keep saving to grow your tree!</p>
           </div>
@@ -114,6 +152,26 @@ export function NewMoneyTreeScreen() {
             </div>
           </div>
         </Card>
+
+        {/* --- TEMPORARY INPUT FIELD --- */}
+        <Card className="p-5 bg-white border-2 border-dashed border-blue-400 shadow-sm rounded-3xl">
+          <h3 className="text-gray-900 mb-3">Dev Control: Animation Level</h3>
+          <div className="space-y-2">
+            <Label htmlFor="animLevel">Set Tree Level (Numgrowing)</Label>
+            <Input
+              id="animLevel"
+              type="number"
+              value={animationLevel}
+              onChange={(e) => setAnimationLevel(Number(e.target.value))}
+              className="w-full h-11 bg-gray-50 border-0 rounded-xl shadow-sm"
+            />
+            <p className="text-xs text-gray-500">
+              Change this number to test the Rive animation states.
+            </p>
+          </div>
+        </Card>
+        {/* --- END TEMPORARY FIELD --- */}
+
 
         {/* Milestones */}
         <Card className="p-5 bg-white border-0 shadow-sm rounded-3xl">
