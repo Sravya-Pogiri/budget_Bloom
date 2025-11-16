@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LoginScreen } from "./components/LoginScreen";
 import { HomeScreen } from "./components/HomeScreen";
 import { NewDashboardScreen } from "./components/NewDashboardScreen";
@@ -15,6 +15,29 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showHome, setShowHome] = useState(true);
   const [activeScreen, setActiveScreen] = useState<"dashboard" | "goals" | "chat" | "tree" | "rewards" | "profile">("dashboard");
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    const pwa =
+      (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+      // @ts-ignore
+      (typeof window.navigator !== "undefined" && (window.navigator as any).standalone === true);
+    setIsStandalone(!!pwa);
+  }, []);
+
+  useEffect(() => {
+    const openProfileTransactions = () => {
+      setActiveScreen("profile");
+      // give the screen a tick to mount before ProfileScreen opens the dialog
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("profile-open-card-dialog"));
+      }, 50);
+    };
+    window.addEventListener("open-card-transactions", openProfileTransactions);
+    return () => {
+      window.removeEventListener("open-card-transactions", openProfileTransactions);
+    };
+  }, []);
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -36,6 +59,11 @@ export default function App() {
   // Show login screen if not logged in
   if (!isLoggedIn) {
     return (
+      isStandalone ? (
+        <div className="min-h-screen bg-white">
+          <LoginScreen onLogin={handleLogin} />
+        </div>
+      ) : (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
         {/* iPhone 16 Frame */}
         <div className="relative">
@@ -66,13 +94,18 @@ export default function App() {
             </div>
           </div>
         </div>
-      </div>
+      </div>)
     );
   }
 
   // Show home screen after login
   if (showHome) {
     return (
+      isStandalone ? (
+        <div className="min-h-screen bg-white">
+          <HomeScreen onGetStarted={handleGetStarted} />
+        </div>
+      ) : (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
         {/* iPhone 16 Frame */}
         <div className="relative">
@@ -103,7 +136,7 @@ export default function App() {
             </div>
           </div>
         </div>
-      </div>
+      </div>)
     );
   }
 
@@ -111,6 +144,59 @@ export default function App() {
   return (
     <>
       <Toaster position="top-center" />
+      {isStandalone ? (
+        <div className="min-h-screen bg-white flex flex-col">
+          {/* App Header */}
+          <div className="bg-white px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl text-gray-900">BudgetBloom</h1>
+                <p className="text-sm text-gray-500">
+                  {activeScreen === "dashboard" && "Your Financial Overview"}
+                  {activeScreen === "goals" && "Savings Goals"}
+                  {activeScreen === "chat" && "AI Money Assistant"}
+                  {activeScreen === "tree" && "Your Money Tree"}
+                  {activeScreen === "rewards" && "Your Rewards"}
+                  {activeScreen === "profile" && "Your Profile"}
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm">
+                <TreeLogo size={48} />
+              </div>
+            </div>
+          </div>
+
+          {/* Screen Content (scrolls) */}
+          <div className="flex-1 overflow-y-auto">
+            {activeScreen === "dashboard" && <NewDashboardScreen />}
+            {activeScreen === "goals" && <SavingsGoalsScreen />}
+            {activeScreen === "chat" && <NewChatScreen />}
+            {activeScreen === "tree" && <NewMoneyTreeScreen />}
+            {activeScreen === "rewards" && <NewRewardsScreen />}
+            {activeScreen === "profile" && <ProfileScreen />}
+          </div>
+
+          {/* Bottom Navigation */}
+          <div className="bg-white border-t border-gray-100 px-1 py-2 flex justify-around safe-area-bottom">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeScreen === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveScreen(item.id as any)}
+                  className={`flex flex-col items-center justify-center py-2 px-2 rounded-2xl transition-all min-w-0 ${
+                    isActive ? "bg-[#FCD535] shadow-md" : "text-gray-500 hover:bg-gray-50"
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 mb-0.5 ${isActive ? "text-gray-900" : ""}`} />
+                  <span className={`text-[10px] ${isActive ? "text-gray-900 font-medium" : ""}`}>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
         {/* iPhone 16 Frame */}
         <div className="relative">
@@ -188,7 +274,7 @@ export default function App() {
             </div>
           </div>
         </div>
-      </div>
+      </div>)}
     </>
   );
 }

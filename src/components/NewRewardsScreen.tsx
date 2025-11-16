@@ -9,7 +9,7 @@ export function NewRewardsScreen() {
       type: "Leaves",
       icon: "🍃",
       count: 24,
-      description: "Earned for staying under budget",
+      description: "30‑day login streak earned a leaf",
       earned: true,
       color: "emerald",
     },
@@ -17,7 +17,7 @@ export function NewRewardsScreen() {
       type: "Leaves",
       icon: "🍃",
       count: 8,
-      description: "Awarded for perfect streak week",
+      description: "Stayed on budget for a full week",
       earned: true,
       color: "emerald",
     },
@@ -25,7 +25,7 @@ export function NewRewardsScreen() {
       type: "Branches",
       icon: "🌿",
       count: 6,
-      description: "Unlocked at Level 3",
+      description: "Level up by consistent saving",
       earned: true,
       color: "amber",
     },
@@ -48,9 +48,9 @@ export function NewRewardsScreen() {
   ];
 
   const recentAchievements = [
-    { title: "Stayed under budget", date: "Today", icon: "✅", color: "emerald" },
-    { title: "7-day streak!", date: "Yesterday", icon: "🔥", color: "orange" },
-    { title: "Attended campus event", date: "Nov 13", icon: "🎉", color: "blue" },
+    { title: "Stayed under budget all week", date: "Today", icon: "✅", color: "emerald" },
+    { title: "30‑day login streak achieved", date: "Yesterday", icon: "🔥", color: "orange" },
+    { title: "Consistent saving leveled you up", date: "Nov 13", icon: "🌿", color: "amber" },
     { title: "Healthy meal choice", date: "Nov 12", icon: "🥗", color: "green" },
     { title: "Used campus resources", date: "Nov 11", icon: "🎓", color: "purple" },
   ];
@@ -116,17 +116,17 @@ export function NewRewardsScreen() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <p className={reward.earned ? "text-white" : "text-gray-600"}>
+                        <p className={reward.earned ? "text-gray-900" : "text-gray-600"}>
                           {reward.type}
                         </p>
-                        {reward.earned && <CheckCircle2 className="w-4 h-4 text-white" />}
+                        {reward.earned && <CheckCircle2 className="w-4 h-4 text-gray-900" />}
                       </div>
-                      <p className={`text-sm ${reward.earned ? "text-white/90" : "text-gray-500"}`}>
+                      <p className={`text-sm ${reward.earned ? "text-gray-700" : "text-gray-500"}`}>
                         {reward.description}
                       </p>
                     </div>
                   </div>
-                  <div className={`text-2xl ${reward.earned ? "text-white" : "text-gray-400"}`}>
+                  <div className={`text-2xl ${reward.earned ? "text-gray-900" : "text-gray-400"}`}>
                     ×{reward.count}
                   </div>
                 </div>

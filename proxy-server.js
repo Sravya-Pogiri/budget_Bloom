@@ -1,48 +1,49 @@
 /**
- * Proxy Server for Rutgers RU Express / Meal Plan
+ * Proxy Server for Rutgers RU Express (budget_Bloom)
  * - Runs locally on port 3001
- * - Used so your phone can call Rutgers without CORS issues
- *
- * Run: npm run proxy
+ * - Loosened CORS to allow requests from your iPhone over LAN
+ * 
+ * Run:
+ *   node proxy-server.js
+ * 
+ * Env in your app (.env):
+ *   VITE_RUTGERS_PROXY=http://YOUR_MAC_IP:3001
+ *   VITE_RUTGERS_SKEY=your_current_skey_here
  */
 
-const express = require("express");
-const cors = require("cors");
+// Use CommonJS here to avoid requiring "type": "module"
+const express = require('express');
+const cors = require('cors');
 
 const app = express();
 const PORT = 3001;
 
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  })
-);
+// Allow any origin on your LAN during development (simplest for mobile testing)
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// Simple health check
-app.get("/health", (_req, res) => {
+// Health check
+app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
 // Proxy endpoint for Rutgers balance page
-app.get("/api/rutgers-balance", async (req, res) => {
+app.get('/api/rutgers-balance', async (req, res) => {
   try {
     const skey = req.query.skey;
     if (!skey) {
-      return res.status(400).json({ error: "Session key (skey) required" });
+      return res.status(400).json({ error: 'Session key (skey) required' });
     }
 
-    const url = `https://services.jsatech.com/index.php?skey=${encodeURIComponent(
-      skey
-    )}&cid=52`;
-    console.log(`📡 Proxying Rutgers URL: ${url.substring(0, 80)}...`);
+    const url = `https://services.jsatech.com/index.php?skey=${encodeURIComponent(skey)}&cid=52`;
+    console.log(`📡 Proxying: ${url.substring(0, 80)}...`);
 
+    // Use global fetch (Node 18+). If your Node is older, upgrade Node or install node-fetch.
     const response = await fetch(url, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        Accept: "text/html",
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        Accept: 'text/html',
       },
     });
 
@@ -54,19 +55,19 @@ app.get("/api/rutgers-balance", async (req, res) => {
     }
 
     const html = await response.text();
-    console.log(`✅ Got HTML from Rutgers: ${html.length} chars`);
+    console.log(`✅ Got HTML: ${html.length} chars`);
 
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
-  } catch (err) {
-    console.error("❌ Proxy error:", err.message);
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error('❌ Proxy error:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
 app.listen(PORT, () => {
   console.log(`\n🚀 Proxy server running at http://localhost:${PORT}`);
-  console.log("📱 Set VITE_RUTGERS_PROXY to http://YOUR_MAC_IP:3001\n");
+  console.log('📱 Make sure VITE_RUTGERS_PROXY points to http://YOUR_MAC_IP:3001\n');
 });
 
 

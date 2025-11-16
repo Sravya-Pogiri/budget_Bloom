@@ -4,10 +4,12 @@ import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { User, Bell, Shield, HelpCircle, Settings, ChevronRight, LogOut, CreditCard, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { loadTransactions, TransactionRecord } from "../services/dataContext";
 
 type SettingItem = {
   icon?: React.ComponentType<any>;
@@ -18,6 +20,7 @@ type SettingItem = {
 };
 export function ProfileScreen() {
   const [showAddCard, setShowAddCard] = useState(false);
+  const [showCardDialog, setShowCardDialog] = useState(false);
   const [cardData, setCardData] = useState({
     holderName: "",
     cardNumber: "",
@@ -25,10 +28,35 @@ export function ProfileScreen() {
     cvv: "",
     rememberCard: false,
   });
+  const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
+  const [loadingTx, setLoadingTx] = useState(false);
 
   const savedCards = [
     { lastFour: "1234", type: "VISA", holder: "John Doe", expire: "12/25" },
   ];
+
+  useEffect(() => {
+    const loadCSV = async () => {
+      try {
+        setLoadingTx(true);
+        const rows = await loadTransactions();
+        const sorted = [...rows].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        setTransactions(sorted);
+      } catch {
+        setTransactions([]);
+      } finally {
+        setLoadingTx(false);
+      }
+    };
+    loadCSV();
+    const openDialog = () => setShowCardDialog(true);
+    window.addEventListener("profile-open-card-dialog", openDialog);
+    return () => {
+      window.removeEventListener("profile-open-card-dialog", openDialog);
+    };
+  }, []);
 
   const settingsSections: {
   title: string;
@@ -127,7 +155,7 @@ export function ProfileScreen() {
         
         {/* Saved Cards */}
         {savedCards.map((card, index) => (
-          <Card key={index} className="mb-3 p-4 bg-white">
+          <Card key={index} className="mb-3 p-4 bg-white cursor-pointer" onClick={() => setShowCardDialog(true)}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -271,6 +299,77 @@ export function ProfileScreen() {
           </Card>
         )}
       </div>
+
+      {/* Card details + recent transactions */}
+      <Dialog open={showCardDialog} onOpenChange={setShowCardDialog}>
+        <DialogContent className="bg-white w-full max-w-[420px] max-h-[85dvh] flex flex-col min-h-0">
+          <DialogHeader className="sticky top-0 bg-white z-10">
+            <DialogTitle>Card Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 flex-1 overflow-hidden min-h-0">
+            <div className="p-4 rounded-lg border bg-white">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-900">VISA •••• 1234</p>
+                    <p className="text-xs text-gray-500">John Doe</p>
+                    <p className="text-xs text-gray-500">Expires 12/25</p>
+                  </div>
+                </div>
+                <Button className="bg-red-500 hover:bg-red-600 text-white h-9" onClick={() => setShowCardDialog(false)}>
+                  Remove card
+                </Button>
+              </div>
+            </div>
+            <div className="mt-2">
+              <h4 className="text-sm text-gray-700 mb-2">Recent Transactions</h4>
+              <div className="max-h-[350px] overflow-y-auto">
+                {loadingTx ? (
+                  <div className="p-4 text-sm text-gray-500">Loading...</div>
+                ) : transactions.length === 0 ? (
+                  <div className="p-4 text-sm text-gray-500">No transactions found.</div>
+                ) : (
+                  transactions.slice(0, 100).map((t) => {
+                    const dateStr = (() => {
+                      const parts = String(t.date).split("-");
+                      if (parts.length === 3) {
+                        const y = Number(parts[0]);
+                        const m = Number(parts[1]) - 1;
+                        const d = Number(parts[2]);
+                        const local = new Date(y, m, d);
+                        return local.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+                      }
+                      return String(t.date);
+                    })();
+                    return (
+                      <div
+                        key={t.transaction_id}
+                        className="rounded-lg border p-4 mb-2 bg-white shadow-sm"
+                      >
+                        <p className="text-sm text-gray-900">
+                          {t.merchant} • {t.category} • {t.location}
+                        </p>
+                        <p className="text-base font-semibold text-gray-900">
+                          ${t.amount.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">{dateStr} • {t.payment_method}</p>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+            <div className="sticky bottom-0 bg-white pt-2">
+              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11" onClick={() => setShowCardDialog(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* App Info */}
       <Card className="mb-4 p-4 bg-white">

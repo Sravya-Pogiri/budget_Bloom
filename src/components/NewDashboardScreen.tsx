@@ -1,5 +1,5 @@
 import React from "react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
@@ -7,11 +7,13 @@ import { Input } from "./ui/input";
 import { TrendingDown, TrendingUp, Plus, Calendar, Bell } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { toast } from "sonner";
+import { loadTransactions, getThisWeekRange, TransactionRecord } from "../services/dataContext";
 
 interface Event {
   name: string;
   cost: number;
-  date: string;
+  dateISO: string;
+  dateLabel: string;
 }
 
 export function NewDashboardScreen() {
@@ -19,60 +21,203 @@ export function NewDashboardScreen() {
   const [eventName, setEventName] = useState("");
   const [eventCost, setEventCost] = useState("");
   const [events, setEvents] = useState<Event[]>([
-    { name: "Campus Concert", cost: 0, date: "Nov 14" },
-    { name: "Movie Night", cost: 0, date: "Nov 10" },
+    { name: "Campus Concert", cost: 0, dateISO: "2025-11-14", dateLabel: "Nov 14" },
+    { name: "Movie Night", cost: 0, dateISO: "2025-11-10", dateLabel: "Nov 10" },
   ]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
+  const TOTAL_BUDGET = 1000; // per request
+
+  useEffect(() => {
+    let mounted = true;
+    loadTransactions().then((rows) => {
+      if (mounted) setTransactions(rows);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Helpers to compute time windows based on today's actual date
+  const parseLocalDate = (dateStr: string) => {
+    // Safely parse YYYY-MM-DD into a local Date without timezone shifting
+    const parts = String(dateStr).split("-");
+    if (parts.length === 3) {
+      const y = Number(parts[0]);
+      const m = Number(parts[1]) - 1;
+      const d = Number(parts[2]);
+      const result = new Date(y, m, d);
+      if (!isNaN(result.getTime())) return result;
+    }
+    const fallback = new Date(dateStr);
+    return fallback;
+  };
+
+  const isInThisWeek = (dateStr: string) => {
+    const d = parseLocalDate(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const { start, end } = getThisWeekRange(); // Sun..Sat (exclusive end)
+    return d >= start && d < end;
+  };
+
+  const isInThisMonth = (dateStr: string) => {
+    const d = parseLocalDate(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  };
+
+  const periodRows = useMemo(() => {
+    if (!transactions.length) return [];
+    return transactions.filter((t) =>
+      dateRange === "week" ? isInThisWeek(t.date) : isInThisMonth(t.date)
+    );
+  }, [transactions, dateRange]);
+
+  const periodEvents = useMemo(() => {
+    return events.filter((e) =>
+      dateRange === "week" ? isInThisWeek(e.dateISO) : isInThisMonth(e.dateISO)
+    );
+  }, [events, dateRange]);
+
+  const totalSpentAllTime = useMemo(
+    () => transactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
+    [transactions]
+  );
+  const totalSpentPeriod = useMemo(
+    () =>
+      periodRows.reduce((sum, t) => sum + (Number(t.amount) || 0), 0) +
+      periodEvents.reduce((sum, e) => sum + (Number(e.cost) || 0), 0),
+    [periodRows, periodEvents]
+  );
+
+  const percentUsed = Math.min(100, (totalSpentPeriod / TOTAL_BUDGET) * 100 || 0);
 
   const budgetData = {
-    currentBalance: 245.60,
-    totalBudget: 350.00,
-    spent: 104.40,
-    percentUsed: 73,
+    currentBalance: totalSpentAllTime, // per request: show actual sum of CSV amounts
+    totalBudget: TOTAL_BUDGET,
+    spent: totalSpentPeriod,
+    percentUsed: Math.round(percentUsed),
   };
 
   // Spending breakdown by category
-  const spendingData = [
-    { name: "Dining", value: 32.75, color: "#FCD535", icon: "🍽️" },
-    { name: "Education", value: 45.00, color: "#3B82F6", icon: "📚" },
-    { name: "Transport", value: 15.00, color: "#10B981", icon: "🚌" },
-    { name: "Food", value: 8.50, color: "#F59E0B", icon: "🍿" },
-    { name: "Other", value: 3.15, color: "#8B5CF6", icon: "🛍️" },
-  ];
+  const categoryTotals = useMemo(() => {
+    const map: Record<string, number> = {};
+    periodRows.forEach((t) => {
+      const cat = t.category || "Other";
+      map[cat] = (map[cat] || 0) + (Number(t.amount) || 0);
+    });
+    // Attribute paid events to Entertainment by default
+    periodEvents.forEach((e) => {
+      if ((Number(e.cost) || 0) <= 0) return;
+      const cat = "Entertainment";
+      map[cat] = (map[cat] || 0) + (Number(e.cost) || 0);
+    });
+    return map;
+  }, [periodRows, periodEvents]);
+  const categoryPalette: Record<string, { color: string; icon: string }> = {
+    Dining: { color: "#FCD535", icon: "🍽️" },
+    Books: { color: "#3B82F6", icon: "📚" },
+    Transport: { color: "#10B981", icon: "🚌" },
+    Grocery: { color: "#F59E0B", icon: "🛒" },
+    Pharmacy: { color: "#8B5CF6", icon: "💊" },
+    Merchandise: { color: "#06B6D4", icon: "🛍️" },
+    Services: { color: "#A78BFA", icon: "🧾" },
+    Entertainment: { color: "#EF4444", icon: "🎬" },
+    "": { color: "#D1D5DB", icon: "❓" },
+    Other: { color: "#D1D5DB", icon: "❓" },
+  };
+  const spendingData = Object.entries(categoryTotals)
+    .map(([name, value]) => ({
+      name,
+      value,
+      color: (categoryPalette[name]?.color) || "#D1D5DB",
+      icon: (categoryPalette[name]?.icon) || "❓",
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6);
 
   // Spending trend over time
-  const trendData = dateRange === "week" 
-    ? [
-        { day: "Mon", amount: 15 },
-        { day: "Tue", amount: 8 },
-        { day: "Wed", amount: 25 },
-        { day: "Thu", amount: 12 },
-        { day: "Fri", amount: 32 },
-        { day: "Sat", amount: 7 },
-        { day: "Sun", amount: 5 },
-      ]
-    : [
-        { day: "Week 1", amount: 45 },
-        { day: "Week 2", amount: 78 },
-        { day: "Week 3", amount: 52 },
-        { day: "Week 4", amount: 104 },
-      ];
+  const trendData = useMemo(() => {
+    if (dateRange === "week") {
+      const labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const amounts = new Array(7).fill(0);
+      periodRows.forEach((t) => {
+        const d = parseLocalDate(t.date);
+        if (isNaN(d.getTime())) return;
+        const idx = d.getDay();
+        amounts[idx] += Number(t.amount) || 0;
+      });
+      periodEvents.forEach((e) => {
+        const d = parseLocalDate(e.dateISO);
+        if (isNaN(d.getTime())) return;
+        const idx = d.getDay();
+        amounts[idx] += Number(e.cost) || 0;
+      });
+      return labels.map((day, i) => ({ day, amount: Number(amounts[i].toFixed(2)) }));
+    } else {
+      // Group by week number within current month (1-5)
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const buckets: Record<string, number> = {};
+      periodRows.forEach((t) => {
+        const d = parseLocalDate(t.date);
+        if (isNaN(d.getTime())) return;
+        if (d.getFullYear() !== year || d.getMonth() !== month) return;
+        const weekOfMonth = Math.ceil((d.getDate() - new Date(d.getFullYear(), d.getMonth(), 1).getDay()) / 7) || 1;
+        const key = `Week ${weekOfMonth}`;
+        buckets[key] = (buckets[key] || 0) + (Number(t.amount) || 0);
+      });
+      periodEvents.forEach((e) => {
+        const d = parseLocalDate(e.dateISO);
+        if (isNaN(d.getTime())) return;
+        if (d.getFullYear() !== year || d.getMonth() !== month) return;
+        const weekOfMonth = Math.ceil((d.getDate() - new Date(d.getFullYear(), d.getMonth(), 1).getDay()) / 7) || 1;
+        const key = `Week ${weekOfMonth}`;
+        buckets[key] = (buckets[key] || 0) + (Number(e.cost) || 0);
+      });
+      const keys = ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"];
+      return keys
+        .filter((k) => k in buckets)
+        .map((k) => ({ day: k, amount: Number(buckets[k].toFixed(2)) }));
+    }
+  }, [periodRows, periodEvents, dateRange]);
 
   const recentExpenses = [
-    { name: "Coffee", amount: 5.75, date: "Today", category: "Dining", icon: "☕" },
-    { name: "Textbook", amount: 45.00, date: "Yesterday", category: "Education", icon: "📚" },
-    { name: "Lunch", amount: 12.50, date: "Nov 13", category: "Dining", icon: "🍽️" },
-    { name: "Bus Pass", amount: 15.00, date: "Nov 12", category: "Transport", icon: "🚌" },
-    { name: "Snacks", amount: 8.50, date: "Nov 11", category: "Food", icon: "🍿" },
+    // Top 5 most recent in the selected period
+    ...[...periodRows]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5)
+      .map((t) => ({
+        name: t.merchant || t.category || "Expense",
+        amount: Number(t.amount) || 0,
+        date: (() => {
+          // Format YYYY-MM-DD as local date without timezone shifting
+          const parts = String(t.date).split("-");
+          if (parts.length === 3) {
+            const y = Number(parts[0]);
+            const m = Number(parts[1]) - 1; // 0-based
+            const d = Number(parts[2]);
+            const local = new Date(y, m, d);
+            return local.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+          }
+          return String(t.date);
+        })(),
+        category: t.category || "Other",
+        icon: "💳",
+      })),
   ];
 
   const handleAddEvent = () => {
     if (eventName.trim() && eventCost.trim()) {
-      const newEvent: Event = {
-        name: eventName,
-        cost: parseFloat(eventCost),
-        date: "Today",
-      };
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const iso = `${yyyy}-${mm}-${dd}`;
+      const label = now.toLocaleDateString(undefined, { month: "short", day: "numeric" }) || "Today";
+      const newEvent: Event = { name: eventName, cost: parseFloat(eventCost), dateISO: iso, dateLabel: label };
       setEvents([newEvent, ...events]);
       setEventName("");
       setEventCost("");
@@ -180,7 +325,9 @@ export function NewDashboardScreen() {
               </div>
               <p className="text-sm text-emerald-800">Saved</p>
             </div>
-            <p className="text-3xl text-emerald-700">$245</p>
+            <p className="text-3xl text-emerald-700">
+              ${Math.max(0, TOTAL_BUDGET - totalSpentPeriod).toFixed(0)}
+            </p>
             <p className="text-xs text-emerald-600">This {dateRange}</p>
           </Card>
           <Card className="p-5 bg-blue-50 border-0 shadow-sm rounded-2xl">
@@ -190,7 +337,7 @@ export function NewDashboardScreen() {
               </div>
               <p className="text-sm text-blue-800">Spent</p>
             </div>
-            <p className="text-3xl text-blue-700">$104</p>
+            <p className="text-3xl text-blue-700">${totalSpentPeriod.toFixed(0)}</p>
             <p className="text-xs text-blue-600">This {dateRange}</p>
           </Card>
         </div>
@@ -354,12 +501,12 @@ export function NewDashboardScreen() {
                     </div>
                     <div>
                       <p className="text-gray-900">{event.name}</p>
-                      <p className="text-xs text-gray-500">{event.date}</p>
+                      <p className="text-xs text-gray-500">{event.dateLabel}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className={`font-medium ${event.cost === 0 ? "text-emerald-600" : "text-blue-600"}`}>
-                      {event.cost === 0 ? "Free!" : `-$${event.cost.toFixed(2)}`}
+                      {event.cost === 0 ? "Free!" : `-$${Number(event.cost).toFixed(2)}`}
                     </p>
                   </div>
                 </div>
@@ -395,6 +542,17 @@ export function NewDashboardScreen() {
                 </div>
               </div>
             ))}
+          </div>
+          <div className="mt-3">
+            <Button
+              size="sm"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white h-10 rounded-xl"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("open-card-transactions"));
+              }}
+            >
+              See All
+            </Button>
           </div>
         </Card>
       </div>
