@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useRef, useEffect } from "react";
 import { ChatMessage } from "./ChatMessage";
 import { QuickActions } from "./QuickActions";

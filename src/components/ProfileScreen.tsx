@@ -1,3 +1,4 @@
+import React from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
@@ -8,6 +9,13 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
 
+type SettingItem = {
+  icon?: React.ComponentType<any>;
+  label: string;
+  hasArrow?: boolean;
+  hasToggle?: boolean;
+  enabled?: boolean;
+};
 export function ProfileScreen() {
   const [showAddCard, setShowAddCard] = useState(false);
   const [cardData, setCardData] = useState({
@@ -22,33 +30,35 @@ export function ProfileScreen() {
     { lastFour: "1234", type: "VISA", holder: "John Doe", expire: "12/25" },
   ];
 
-  const settingsSections = [
-    {
-      title: "Account",
-      items: [
-        { icon: User, label: "Edit Profile", hasArrow: true },
-        { icon: Shield, label: "Privacy & Security", hasArrow: true },
-        { icon: Bell, label: "Notifications", hasToggle: true, enabled: true },
-      ],
-    },
-    {
-      title: "Preferences",
-      items: [
-        { icon: Settings, label: "Budget Settings", hasArrow: true },
-        { label: "Smart Alerts", hasToggle: true, enabled: true },
-        { label: "Daily Reminders", hasToggle: true, enabled: false },
-      ],
-    },
-    {
-      title: "Support",
-      items: [
-        { icon: HelpCircle, label: "Help Center", hasArrow: true },
-        { label: "Contact Support", hasArrow: true },
-        { label: "Send Feedback", hasArrow: true },
-      ],
-    },
-  ];
-
+  const settingsSections: {
+  title: string;
+  items: SettingItem[];
+}[] = [
+  {
+    title: "Account",
+    items: [
+      { icon: User, label: "Edit Profile", hasArrow: true },
+      { icon: Shield, label: "Privacy & Security", hasArrow: true },
+      { icon: Bell, label: "Notifications", hasToggle: true, enabled: true },
+    ] as SettingItem[],
+  },
+  {
+    title: "Preferences",
+    items: [
+      { icon: Settings, label: "Budget Settings", hasArrow: true },
+      { label: "Smart Alerts", hasToggle: true, enabled: true },
+      { label: "Daily Reminders", hasToggle: true, enabled: false },
+    ] as SettingItem[],
+  },
+  {
+    title: "Support",
+    items: [
+      { icon: HelpCircle, label: "Help Center", hasArrow: true },
+      { label: "Contact Support", hasArrow: true },
+      { label: "Send Feedback", hasArrow: true },
+    ] as SettingItem[],
+  },
+];
   return (
     <div className="flex-1 overflow-y-auto p-4 bg-white">
       {/* Profile Header */}
@@ -241,9 +251,10 @@ export function ProfileScreen() {
                 <Checkbox
                   id="remember"
                   checked={cardData.rememberCard}
-                  onCheckedChange={(checked) => 
-                    setCardData({ ...cardData, rememberCard: checked as boolean })
-                  }
+                  onCheckedChange={(checked: boolean | "indeterminate") =>
+                setCardData({ ...cardData, rememberCard: checked === true })
+                }   
+
                 />
                 <label
                   htmlFor="remember"

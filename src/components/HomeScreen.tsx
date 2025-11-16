@@ -1,3 +1,4 @@
+import React from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Sprout, TrendingUp, Award, Brain } from "lucide-react";
