@@ -2,6 +2,7 @@
       "name": "AI Chatbot Screen",
       "version": "0.1.0",
       "private": true,
+      "type": "module",
       "dependencies": {
             "@radix-ui/react-accordion": "^1.2.3",
             "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -46,7 +47,11 @@
             "sonner": "^2.0.3",
             "tailwind-merge": "*",
       "vaul": "^1.1.2",
-      "papaparse": "^5.4.1"
+            "papaparse": "^5.4.1",
+            "@google/generative-ai": "^0.24.1",
+            "express": "^5.1.0",
+            "cors": "^2.8.5",
+            "node-fetch": "^2.7.0"
       },
       "overrides": {},
       "devDependencies": {
@@ -59,6 +64,7 @@
       },
       "scripts": {
             "dev": "vite",
-            "build": "vite build"
+            "build": "vite build",
+            "proxy": "node proxy-server.js"
       }
 }
