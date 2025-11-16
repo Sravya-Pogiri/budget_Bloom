@@ -28,7 +28,7 @@ export function NewMoneyTreeScreen() {
 
   // 1. Destructure ONLY RiveComponent and rive
   const { RiveComponent, rive } = useRive({
-    src: "/Tree.riv", // Path to your Rive file in the /public folder
+    src: "/TreeY.riv", // Path to your Rive file in the /public folder
     stateMachines: "State Machine 1", // From your .riv file
     artboard: "Artboard", // From your .riv file
     autoplay: true,
