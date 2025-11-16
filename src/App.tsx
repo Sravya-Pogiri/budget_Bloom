@@ -7,6 +7,7 @@ import { NewChatScreen } from "./components/NewChatScreen";
 import { NewMoneyTreeScreen } from "./components/NewMoneyTreeScreen";
 import { NewRewardsScreen } from "./components/NewRewardsScreen";
 import { ProfileScreen } from "./components/ProfileScreen";
+import { SplashScreen } from "./components/SplashScreen";
 import { MessageCircle, LayoutDashboard, Target, Sprout, Gift, User } from "lucide-react";
 import { TreeLogo } from "./components/TreeLogo";
 import { Toaster } from "./components/ui/sonner";
@@ -16,6 +17,7 @@ export default function App() {
   const [showHome, setShowHome] = useState(true);
   const [activeScreen, setActiveScreen] = useState<"dashboard" | "goals" | "chat" | "tree" | "rewards" | "profile">("dashboard");
   const [isStandalone, setIsStandalone] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     const pwa =
@@ -55,6 +57,52 @@ export default function App() {
   const handleGetStarted = () => {
     setShowHome(false);
   };
+
+  const handleAnimationComplete = () => {
+    setShowSplash(false);
+  };
+
+  // Show splash screen first
+  if (showSplash) {
+    return (
+      isStandalone ? (
+        <div className="min-h-screen bg-white">
+          <SplashScreen onAnimationComplete={handleAnimationComplete} />
+        </div>
+      ) : (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
+        {/* iPhone 16 Frame */}
+        <div className="relative">
+          {/* iPhone Notch */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[120px] h-[30px] bg-black rounded-b-3xl z-50"></div>
+          
+          {/* iPhone Screen */}
+          <div className="w-[393px] h-[852px] bg-black rounded-[60px] p-[12px] shadow-2xl">
+            <div className="w-full h-full bg-white rounded-[48px] overflow-hidden flex flex-col">
+              {/* Status Bar */}
+              <div className="h-[44px] bg-white flex items-center justify-between px-6 pt-2">
+                <span className="text-sm">9:41</span>
+                <div className="flex items-center gap-1">
+                  <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+                    <path d="M0 1.5C0 0.671573 0.671573 0 1.5 0H3.5C4.32843 0 5 0.671573 5 1.5V10.5C5 11.3284 4.32843 12 3.5 12H1.5C0.671573 12 0 11.3284 0 10.5V1.5Z" fill="black"/>
+                    <path d="M6 2.5C6 1.67157 6.67157 1 7.5 1H9.5C10.3284 1 11 1.67157 11 2.5V10.5C11 11.3284 10.3284 12 9.5 12H7.5C6.67157 12 6 11.3284 6 10.5V2.5Z" fill="black"/>
+                    <path d="M12 4.5C12 3.67157 12.6716 3 13.5 3H15.5C16.3284 3 17 3.67157 17 4.5V10.5C17 11.3284 16.3284 12 15.5 12H13.5C12.6716 12 12 11.3284 12 10.5V4.5Z" fill="black"/>
+                  </svg>
+                  <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+                    <path fillRule="evenodd" clipRule="evenodd" d="M15.5 0H14.5C13.6716 0 13 0.671573 13 1.5V10.5C13 11.3284 13.6716 12 14.5 12H15.5C16.3284 12 17 11.3284 17 10.5V1.5C17 0.671573 16.3284 0 15.5 0ZM0 3C0 1.89543 0.895431 1 2 1H11C12.1046 1 13 1.89543 13 3V9C13 10.1046 12.1046 11 11 11H2C0.89543 11 0 10.1046 0 9V3Z" fill="black" fillOpacity="0.35"/>
+                    <path d="M2 2H11V10H2V2Z" fill="black"/>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Splash Screen */}
+              <SplashScreen onAnimationComplete={handleAnimationComplete} />
+            </div>
+          </div>
+        </div>
+      </div>)
+    );
+  }
 
   // Show login screen if not logged in
   if (!isLoggedIn) {
