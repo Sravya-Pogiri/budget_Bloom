@@ -58,6 +58,31 @@ export function NewChatScreen() {
     setTimeout(() => {
       const lowerMessage = userMessage.toLowerCase();
 
+      // Q&A from CSV: "how much did i spend on <merchant> this month"
+      const spendMatch = lowerMessage.match(/how much did i spend on ([a-z0-9 '&-]+)/i);
+      if (spendMatch && analysis) {
+        const merchantQuery = spendMatch[1].trim();
+        const thisMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        const total = (analysis.recentTransactions || [])
+          .filter((t) => {
+            const tMonth = (t.date || "").slice(0, 7);
+            return tMonth === thisMonth && t.merchant.toLowerCase().includes(merchantQuery);
+          })
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `You spent $${total.toFixed(2)} at ${merchantQuery} this month.`,
+            type: "text",
+          },
+        ]);
+        setIsTyping(false);
+        setShowActions(true);
+        return;
+      }
+
       if (lowerMessage.includes("budget") || lowerMessage.includes("under budget")) {
         const monthlyBudget = Number(import.meta.env.VITE_MONTHLY_BUDGET ?? 3000);
         const spent = analysis?.totalSpent ?? 0;
