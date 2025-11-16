@@ -45,12 +45,15 @@
             "recharts": "^2.15.2",
             "sonner": "^2.0.3",
             "tailwind-merge": "*",
-            "vaul": "^1.1.2"
+      "vaul": "^1.1.2",
+      "papaparse": "^5.4.1"
       },
+      "overrides": {},
       "devDependencies": {
             "@types/node": "^20.10.0",
             "@types/react": "^19.2.5",
             "@types/react-dom": "^19.2.3",
+            "@types/papaparse": "^5.2.7",
             "@vitejs/plugin-react-swc": "^3.10.2",
             "vite": "6.3.5"
       },

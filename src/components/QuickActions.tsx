@@ -12,7 +12,7 @@ export function QuickActions({ onActionClick }: QuickActionsProps) {
     { label: "Attended free events", action: "attended-free-events" },
     { label: "Tracked spendings", action: "tracked-spendings" },
     { label: "Healthy choices", action: "healthy-choices" },
-    { label: "Used campus resources", action: "used-campus-resources" },
+    { label: "Daily Insights", action: "daily-insights" },
   ];
 
   return (

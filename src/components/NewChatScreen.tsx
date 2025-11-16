@@ -5,6 +5,7 @@ import { QuickActions } from "./QuickActions";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Send, Utensils } from "lucide-react";
+import { analyzeSpending, loadTransactionCSV } from "../services/csvParser";
 
 interface Message {
   id: string;
@@ -27,6 +28,7 @@ export function NewChatScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [showActions, setShowActions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [analysis, setAnalysis] = useState<ReturnType<typeof analyzeSpending> | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,6 +38,19 @@ export function NewChatScreen() {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const tx = await loadTransactionCSV("/final_wallet_transactions_sample.csv");
+      if (!mounted) return;
+      const a = analyzeSpending(tx);
+      setAnalysis(a);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const simulateAIResponse = (userMessage: string) => {
     setIsTyping(true);
     setShowActions(false);
@@ -44,6 +59,8 @@ export function NewChatScreen() {
       const lowerMessage = userMessage.toLowerCase();
 
       if (lowerMessage.includes("budget") || lowerMessage.includes("under budget")) {
+        const monthlyBudget = Number(import.meta.env.VITE_MONTHLY_BUDGET ?? 3000);
+        const spent = analysis?.totalSpent ?? 0;
         setMessages((prev) => [
           ...prev,
           {
@@ -52,13 +69,50 @@ export function NewChatScreen() {
             content: "Excellent! Here's your budget tracking for this month:",
             type: "budget-card",
             data: {
-              before: 2850,
-              after: 2150,
-              budget: 3000,
+              before: Math.round(spent),
+              after: Math.round(spent),
+              budget: monthlyBudget,
             },
           },
         ]);
       } else if (lowerMessage.includes("goal") || lowerMessage.includes("save")) {
+        const categories = analysis?.categoryBreakdown ?? {};
+        const top = Object.entries(categories)
+          .map(([title, v]) => ({ title, current: v.total }))
+          .sort((a, b) => b.current - a.current)
+          .slice(0, 3);
+        const goals =
+          top.length > 0
+            ? top.map((g) => {
+                const target = Math.max(0, Math.round(g.current * 0.8));
+                const savings = Math.round(g.current - target);
+                const description =
+                  g.title === "Dining"
+                    ? "Cook 2 more meals per week"
+                    : g.title === "Transport"
+                    ? "Use campus transit more often"
+                    : "Trim 20% this month";
+                const icon =
+                  g.title === "Dining" ? "🍽️" : g.title === "Books" ? "📚" : g.title === "Grocery" ? "🛒" : "💰";
+                return {
+                  title: g.title,
+                  current: Math.round(g.current),
+                  target,
+                  savings,
+                  description,
+                  icon,
+                };
+              })
+            : [
+                {
+                  title: "General Savings",
+                  current: 0,
+                  target: 0,
+                  savings: 0,
+                  description: "Spend mindfully this week",
+                  icon: "💰",
+                },
+              ];
         setMessages((prev) => [
           ...prev,
           {
@@ -67,36 +121,14 @@ export function NewChatScreen() {
             content: "Based on your spending patterns, here are personalized savings goals I recommend for you:",
             type: "savings-goals",
             data: {
-              goals: [
-                {
-                  title: "Reduce Dining Out",
-                  current: 680,
-                  target: 500,
-                  savings: 180,
-                  description: "Cook 2 more meals per week",
-                  icon: "🍽️",
-                },
-                {
-                  title: "Coffee Savings",
-                  current: 120,
-                  target: 60,
-                  savings: 60,
-                  description: "Bring coffee from home 3x/week",
-                  icon: "☕",
-                },
-                {
-                  title: "Emergency Fund",
-                  current: 340,
-                  target: 500,
-                  savings: 160,
-                  description: "Save $40/week for 4 weeks",
-                  icon: "💰",
-                },
-              ],
+              goals,
             },
           },
         ]);
       } else if (lowerMessage.includes("tree") || lowerMessage.includes("money tree")) {
+        const monthlyBudget = Number(import.meta.env.VITE_MONTHLY_BUDGET ?? 3000);
+        const spent = analysis?.totalSpent ?? 0;
+        const progress = Math.max(0, Math.min(100, Math.round((1 - spent / Math.max(1, monthlyBudget)) * 100)));
         setMessages((prev) => [
           ...prev,
           {
@@ -108,12 +140,18 @@ export function NewChatScreen() {
               level: 4,
               stage: "Young Sapling",
               emoji: "🌱",
-              progress: 65,
-              totalSaved: 1240,
+              progress,
+              totalSaved: Math.max(0, Math.round(monthlyBudget - spent)),
             },
           },
         ]);
-      } else if (lowerMessage.includes("coupon") || lowerMessage.includes("campus") || lowerMessage.includes("resources")) {
+      } else if (
+        lowerMessage.includes("coupon") ||
+        lowerMessage.includes("campus") ||
+        lowerMessage.includes("resources") ||
+        lowerMessage.includes("daily insights") ||
+        lowerMessage.includes("daily-insights")
+      ) {
         setMessages((prev) => [
           ...prev,
           {
@@ -228,8 +266,8 @@ export function NewChatScreen() {
       case "healthy-choices":
         message = "Healthy choices";
         break;
-      case "used-campus-resources":
-        message = "Used campus resources";
+      case "daily-insights":
+        message = "Daily insights";
         break;
     }
 
