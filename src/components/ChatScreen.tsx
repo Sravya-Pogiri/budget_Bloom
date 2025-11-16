@@ -5,6 +5,9 @@ import { QuickActions } from "./QuickActions";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Send, Coins } from "lucide-react";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { askGeminiWithTransactions } from "../services/geminiDataQA";
+import { loadTransactions, TransactionRecord } from "../services/dataContext";
 
 interface Message {
   id: string;
@@ -27,6 +30,10 @@ export function ChatScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [showActions, setShowActions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [geminiReady, setGeminiReady] = useState(false);
+  const genAIRef = useRef<GoogleGenerativeAI | null>(null);
+  const modelRef = useRef<ReturnType<GoogleGenerativeAI["getGenerativeModel"]> | null>(null);
+  const transactionsCacheRef = useRef<TransactionRecord[] | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,125 +43,220 @@ export function ChatScreen() {
     scrollToBottom();
   }, [messages]);
 
-  const simulateAIResponse = (userMessage: string) => {
+  // Initialize Gemini once
+  useEffect(() => {
+    const apiKey =
+      (import.meta as any).env?.VITE_GEMINI_API_KEY ||
+      (import.meta as any).env?.VITE_MODEL_API_KEY;
+    try {
+      if (apiKey) {
+        genAIRef.current = new GoogleGenerativeAI(apiKey);
+        modelRef.current = genAIRef.current.getGenerativeModel({
+          model: (import.meta as any).env?.VITE_GEMINI_MODEL || "gemini-1.5-flash",
+        });
+        setGeminiReady(true);
+      } else {
+        setGeminiReady(false);
+      }
+    } catch {
+      setGeminiReady(false);
+    }
+  }, []);
+
+  // Load and cache CSV transactions
+  const loadTransactionsIfNeeded = async () => {
+    if (transactionsCacheRef.current) return transactionsCacheRef.current;
+    const rows = await loadTransactions();
+    transactionsCacheRef.current = rows;
+    return rows;
+  };
+
+  const getReferenceDate = (rows: TransactionRecord[]) => {
+    let latest = 0;
+    rows.forEach((row) => {
+      const time = new Date(row.date).getTime();
+      if (!isNaN(time)) {
+        latest = Math.max(latest, time);
+      }
+    });
+    if (!latest) return new Date();
+    const now = Date.now();
+    const THIRTY_DAYS = 1000 * 60 * 60 * 24 * 30;
+    if (Math.abs(now - latest) > THIRTY_DAYS) {
+      return new Date(latest);
+    }
+    return new Date();
+  };
+
+  const formatWeekLabel = (start: Date, end: Date) => {
+    const endInclusive = new Date(end);
+    endInclusive.setDate(endInclusive.getDate() - 1);
+    const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+    return `${start.toLocaleDateString(undefined, opts)}-${endInclusive.toLocaleDateString(undefined, opts)}`;
+  };
+
+  const getThisWeekRange = (referenceDate?: Date) => {
+    const now = referenceDate ? new Date(referenceDate) : new Date();
+    const day = now.getDay(); // 0 = Sunday
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(now.getDate() - day); // Start of week (Sunday)
+    const end = new Date(start);
+    end.setDate(start.getDate() + 7); // exclusive end
+    return { start, end };
+  };
+
+  // Simple NL intent: "how much did I spend on {merchant} this month"
+  const tryMerchantSpendAnswer = async (userMessage: string) => {
+    const lower = userMessage.toLowerCase();
+    const match = lower
+      .toLowerCase()
+      .match(/how\s+much\s+did\s+i\s+spend\s+on\s+(.+?)\s+(this|in\s+the)\s+(week|month)/);
+    if (!match) return null;
+    const merchantQuery = match[1].trim();
+    const period = match[3]; // 'week' | 'month'
+    const rows = await loadTransactionsIfNeeded();
+    const referenceDate = getReferenceDate(rows);
+    let filtered: TransactionRecord[] = [];
+    let label = "";
+    if (period === "week") {
+      const { start, end } = getThisWeekRange(referenceDate);
+      filtered = rows.filter((r) => {
+        const d = new Date(r.date);
+        return (
+          d >= start &&
+          d < end &&
+          String(r.merchant).toLowerCase() === merchantQuery.toLowerCase()
+        );
+      });
+      label = `during the week of ${formatWeekLabel(start, end)}`;
+    } else {
+      const month = referenceDate.getMonth();
+      const year = referenceDate.getFullYear();
+      filtered = rows.filter((r) => {
+        const d = new Date(r.date);
+        return (
+          d.getMonth() === month &&
+          d.getFullYear() === year &&
+          String(r.merchant).toLowerCase() === merchantQuery.toLowerCase()
+        );
+      });
+      label = `in ${referenceDate.toLocaleString(undefined, { month: "long", year: "numeric" })}`;
+    }
+    if (filtered.length === 0) return null;
+    const total = filtered.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    return {
+      merchant: filtered[0]?.merchant || merchantQuery,
+      total,
+      count: filtered.length,
+      label,
+    };
+  };
+
+  const askGemini = async (userMessage: string) => {
     setIsTyping(true);
     setShowActions(false);
-
-    setTimeout(() => {
-      const lowerMessage = userMessage.toLowerCase();
-
-      if (lowerMessage.includes("budget") || lowerMessage.includes("under budget")) {
+    // CSV-backed intent first
+    try {
+      const csvAnswer = await tryMerchantSpendAnswer(userMessage);
+      if (csvAnswer) {
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString(),
             role: "assistant",
-            content: "Excellent! Here's your budget tracking for this month:",
-            type: "budget-card",
-            data: {
-              before: 2850,
-              after: 2150,
-              budget: 3000,
-            },
-          },
-        ]);
-      } else if (lowerMessage.includes("tree") || lowerMessage.includes("money tree")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Your Money Tree is thriving! 🌳",
-            type: "money-tree",
-            data: {
-              level: 4,
-              stage: "Young Sapling",
-              emoji: "🌱",
-              progress: 65,
-              totalSaved: 1240,
-            },
-          },
-        ]);
-      } else if (lowerMessage.includes("coupon") || lowerMessage.includes("campus") || lowerMessage.includes("resources")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Great choice! Here are personalized savings opportunities for you:",
-            type: "coupons",
-            data: {
-              coupons: [
-                {
-                  store: "Campus Dining Hall",
-                  discount: "Free meal",
-                  description: "Use your meal plan credits",
-                  category: "Food",
-                  savings: 12,
-                },
-                {
-                  store: "University Library",
-                  discount: "Free",
-                  description: "Textbook rental program",
-                  category: "Education",
-                  savings: 85,
-                },
-                {
-                  store: "Campus Gym",
-                  discount: "Free membership",
-                  description: "Included in student fees",
-                  category: "Health",
-                  savings: 50,
-                },
-              ],
-            },
-          },
-        ]);
-      } else if (lowerMessage.includes("impulse") || lowerMessage.includes("track") || lowerMessage.includes("spending")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Well done! I'm tracking your progress. You've avoided 3 impulse purchases this week and saved $127! Your spending habits are improving:\n\n✅ Waited 24hrs before purchases\n✅ Used the campus coffee shop\n✅ Packed lunch 4 times\n\nKeep up the great work! 🎉",
+            content: `You spent $${csvAnswer.total.toFixed(2)} at ${csvAnswer.merchant} ${csvAnswer.label} across ${csvAnswer.count} transaction(s), based on your CSV.`,
             type: "text",
           },
         ]);
-      } else if (lowerMessage.includes("free") || lowerMessage.includes("event")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Awesome! Attending free events is a smart way to have fun without spending. This month you've attended 5 free campus events and saved approximately $75 on entertainment! 🎉\n\nUpcoming free events:\n🎵 Friday concert at 7pm\n🎬 Movie night on Saturday\n🏃 Morning yoga classes",
-            type: "text",
-          },
-        ]);
-      } else if (lowerMessage.includes("health")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Great focus on wellness! Making healthy choices saves money too:\n\n💪 Used campus gym (free)\n🥗 Cooked meals instead of eating out\n🚶 Walked instead of rideshare\n\nYou've saved $180 this month while staying healthy! Your Money Tree loves healthy choices! 🌱",
-            type: "text",
-          },
-        ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "I'm here to help you make smart financial decisions! Try asking about your budget, Money Tree progress, or ways to save. You can also select an action above! 💡",
-            type: "text",
-          },
-        ]);
+        // Also ask Gemini with transaction context for richer explanation
+        if (geminiReady) {
+          try {
+            const ai = await askGeminiWithTransactions(userMessage);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString(),
+                role: "assistant",
+                content: ai,
+                type: "text",
+              },
+            ]);
+          } catch {
+            // ignore
+          }
+        }
+        return;
       }
+    } catch {
+      // ignore CSV errors and fall through to Gemini
+    }
 
+    const systemPreamble =
+      "You are Budget Bloom, a concise, helpful Rutgers student financial assistant. Answer clearly in under 150 words unless asked for more.";
+    const prompt = `${systemPreamble}\n\nUser: ${userMessage}`;
+    try {
+      if (!geminiReady || !modelRef.current) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content:
+              "AI is unavailable because no Gemini API key is configured. Add VITE_GEMINI_API_KEY to your .env and restart.",
+            type: "text",
+          },
+        ]);
+        return;
+      }
+      // Prefer Gemini with transaction context first
+      try {
+        const ai = await askGeminiWithTransactions(userMessage);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: ai,
+            type: "text",
+          },
+        ]);
+        return;
+      } catch {
+        // fallback to plain model
+      }
+      const result = await modelRef.current.generateContent(prompt);
+      // @ts-ignore
+      const text = await result.response.text();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: text || "I couldn't find an answer. Try rephrasing your question.",
+          type: "text",
+        },
+      ]);
+    } catch (err: any) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            "I had trouble contacting Gemini. Please check your network and VITE_GEMINI_API_KEY, then try again.",
+          type: "text",
+        },
+      ]);
+    } finally {
       setIsTyping(false);
       setShowActions(true);
-    }, 1000);
+    }
+  };
+
+  // Route all messages through Gemini flow (with CSV intent)
+  const simulateAIResponse = (userMessage: string) => {
+    askGemini(userMessage);
   };
 
   const handleSendMessage = () => {

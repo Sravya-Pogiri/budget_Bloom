@@ -5,7 +5,11 @@ import { QuickActions } from "./QuickActions";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Send, Utensils } from "lucide-react";
-import { analyzeSpending, loadTransactionCSV } from "../services/csvParser";
+import { Dialog, DialogContent } from "./ui/dialog";
+import { MealPlanScreen } from "./MealPlanScreen";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { askGeminiWithTransactions } from "../services/geminiDataQA";
+import { loadTransactions, TransactionRecord } from "../services/dataContext";
 
 interface Message {
   id: string;
@@ -20,7 +24,7 @@ export function NewChatScreen() {
     {
       id: "1",
       role: "assistant",
-      content: "Hi! I'm your AI financial assistant. I can help you track your budget, grow your Money Tree, and suggest smart savings goals based on your spending habits. What would you like to know?",
+      content: "Hi! I'm Blossom, your AI financial assistant. I can help you track your budget, grow your Money Tree, and suggest smart savings goals based on your spending habits. What would you like to know?",
       type: "text",
     },
   ]);
@@ -28,7 +32,11 @@ export function NewChatScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [showActions, setShowActions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [analysis, setAnalysis] = useState<ReturnType<typeof analyzeSpending> | null>(null);
+  const [showMealPlan, setShowMealPlan] = useState(false);
+  const [geminiReady, setGeminiReady] = useState(false);
+  const genAIRef = useRef<GoogleGenerativeAI | null>(null);
+  const modelRef = useRef<ReturnType<GoogleGenerativeAI["getGenerativeModel"]> | null>(null);
+  const transactionsCacheRef = useRef<TransactionRecord[] | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -38,224 +46,223 @@ export function NewChatScreen() {
     scrollToBottom();
   }, [messages]);
 
+  // Initialize Gemini once
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const tx = await loadTransactionCSV("/final_wallet_transactions_sample.csv");
-      if (!mounted) return;
-      const a = analyzeSpending(tx);
-      setAnalysis(a);
-    })();
-    return () => {
-      mounted = false;
-    };
+    const apiKey =
+      (import.meta as any).env?.VITE_GEMINI_API_KEY ||
+      (import.meta as any).env?.VITE_MODEL_API_KEY;
+    try {
+      if (apiKey) {
+        genAIRef.current = new GoogleGenerativeAI(apiKey);
+        modelRef.current = genAIRef.current.getGenerativeModel({
+          model: (import.meta as any).env?.VITE_GEMINI_MODEL || "gemini-1.5-flash",
+        });
+        setGeminiReady(true);
+      } else {
+        setGeminiReady(false);
+      }
+    } catch {
+      setGeminiReady(false);
+    }
   }, []);
 
-  const simulateAIResponse = (userMessage: string) => {
+  // Load and cache CSV transactions (for offline merchant Q&A)
+  const loadTransactionsIfNeeded = async () => {
+    if (transactionsCacheRef.current) return transactionsCacheRef.current;
+    const rows = await loadTransactions();
+    transactionsCacheRef.current = rows;
+    return rows;
+  };
+
+  const getReferenceDate = (rows: TransactionRecord[]) => {
+    let latest = 0;
+    rows.forEach((row) => {
+      const time = new Date(row.date).getTime();
+      if (!isNaN(time)) {
+        latest = Math.max(latest, time);
+      }
+    });
+    if (!latest) return new Date();
+    const now = Date.now();
+    const THIRTY_DAYS = 1000 * 60 * 60 * 24 * 30;
+    if (Math.abs(now - latest) > THIRTY_DAYS) {
+      return new Date(latest);
+    }
+    return new Date();
+  };
+
+  const formatWeekLabel = (start: Date, end: Date) => {
+    const endInclusive = new Date(end);
+    endInclusive.setDate(endInclusive.getDate() - 1);
+    const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+    return `${start.toLocaleDateString(undefined, opts)}-${endInclusive.toLocaleDateString(undefined, opts)}`;
+  };
+
+  const getThisWeekRange = (referenceDate?: Date) => {
+    const now = referenceDate ? new Date(referenceDate) : new Date();
+    const day = now.getDay(); // 0 = Sunday
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(now.getDate() - day);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 7);
+    return { start, end };
+  };
+
+  // Detect: "how much did I spend on {merchant} this month"
+  const tryMerchantSpendAnswer = async (userMessage: string) => {
+    const lower = userMessage.toLowerCase();
+    const match = lower
+      .toLowerCase()
+      .match(/how\s+much\s+did\s+i\s+spend\s+on\s+(.+?)\s+(this|in\s+the)\s+(week|month)/);
+    if (!match) return null;
+    const merchantQuery = match[1].trim();
+    const period = match[3]; // 'week' | 'month'
+    const rows = await loadTransactionsIfNeeded();
+    const referenceDate = getReferenceDate(rows);
+    let filtered: TransactionRecord[] = [];
+    let label = "";
+    if (period === "week") {
+      const { start, end } = getThisWeekRange(referenceDate);
+      filtered = rows.filter((r) => {
+        const d = new Date(r.date);
+        return (
+          d >= start &&
+          d < end &&
+          String(r.merchant).toLowerCase() === merchantQuery.toLowerCase()
+        );
+      });
+      label = `during the week of ${formatWeekLabel(start, end)}`;
+    } else {
+      const month = referenceDate.getMonth();
+      const year = referenceDate.getFullYear();
+      filtered = rows.filter((r) => {
+        const d = new Date(r.date);
+        return (
+          d.getMonth() === month &&
+          d.getFullYear() === year &&
+          String(r.merchant).toLowerCase() === merchantQuery.toLowerCase()
+        );
+      });
+      label = `in ${referenceDate.toLocaleString(undefined, { month: "long", year: "numeric" })}`;
+    }
+    if (filtered.length === 0) return null;
+    const total = filtered.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    return {
+      merchant: filtered[0]?.merchant || merchantQuery,
+      total,
+      count: filtered.length,
+      label,
+    };
+  };
+
+  const askGemini = async (userMessage: string) => {
     setIsTyping(true);
     setShowActions(false);
+    const systemPreamble =
+      "You are Budget Bloom, a concise, helpful Rutgers student financial assistant. Answer clearly in under 150 words unless asked for more.";
+    const prompt = `${systemPreamble}\n\nUser: ${userMessage}`;
 
-    setTimeout(() => {
-      const lowerMessage = userMessage.toLowerCase();
+    try {
+      try {
+        // First try CSV-backed answer for merchant-spend queries
+        const csvAnswer = await tryMerchantSpendAnswer(userMessage);
+        if (csvAnswer) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              role: "assistant",
+              content: `You spent $${csvAnswer.total.toFixed(2)} at ${csvAnswer.merchant} ${csvAnswer.label} across ${csvAnswer.count} transaction(s), based on your CSV.`,
+              type: "text",
+            },
+          ]);
+          // Also ask Gemini with full transaction context for a richer explanation if configured
+          if (geminiReady) {
+            try {
+              const ai = await askGeminiWithTransactions(userMessage);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: Date.now().toString(),
+                  role: "assistant",
+                  content: ai,
+                  type: "text",
+                },
+              ]);
+            } catch (ctxErr) {
+              console.warn("Gemini context call failed", ctxErr);
+            }
+          }
+          return;
+        }
+      } catch (csvError) {
+        console.warn("CSV intent failed", csvError);
+      }
 
-      // Q&A from CSV: "how much did i spend on <merchant> this month"
-      const spendMatch = lowerMessage.match(/how much did i spend on ([a-z0-9 '&-]+)/i);
-      if (spendMatch && analysis) {
-        const merchantQuery = spendMatch[1].trim();
-        const thisMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-        const total = (analysis.recentTransactions || [])
-          .filter((t) => {
-            const tMonth = (t.date || "").slice(0, 7);
-            return tMonth === thisMonth && t.merchant.toLowerCase().includes(merchantQuery);
-          })
-          .reduce((sum, t) => sum + (t.amount || 0), 0);
+      if (!geminiReady || !modelRef.current) {
+        // Fallback when no API key
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString(),
             role: "assistant",
-            content: `You spent $${total.toFixed(2)} at ${merchantQuery} this month.`,
+            content:
+              "AI is unavailable because no Gemini API key is configured. Add VITE_GEMINI_API_KEY to your .env and restart.",
             type: "text",
           },
         ]);
-        setIsTyping(false);
-        setShowActions(true);
         return;
       }
-
-      if (lowerMessage.includes("budget") || lowerMessage.includes("under budget")) {
-        const monthlyBudget = Number(import.meta.env.VITE_MONTHLY_BUDGET ?? 3000);
-        const spent = analysis?.totalSpent ?? 0;
+      // Prefer Gemini with transaction context
+      try {
+        const ai = await askGeminiWithTransactions(userMessage);
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString(),
             role: "assistant",
-            content: "Excellent! Here's your budget tracking for this month:",
-            type: "budget-card",
-            data: {
-              before: Math.round(spent),
-              after: Math.round(spent),
-              budget: monthlyBudget,
-            },
-          },
-        ]);
-      } else if (lowerMessage.includes("goal") || lowerMessage.includes("save")) {
-        const categories = analysis?.categoryBreakdown ?? {};
-        const top = Object.entries(categories)
-          .map(([title, v]) => ({ title, current: v.total }))
-          .sort((a, b) => b.current - a.current)
-          .slice(0, 3);
-        const goals =
-          top.length > 0
-            ? top.map((g) => {
-                const target = Math.max(0, Math.round(g.current * 0.8));
-                const savings = Math.round(g.current - target);
-                const description =
-                  g.title === "Dining"
-                    ? "Cook 2 more meals per week"
-                    : g.title === "Transport"
-                    ? "Use campus transit more often"
-                    : "Trim 20% this month";
-                const icon =
-                  g.title === "Dining" ? "🍽️" : g.title === "Books" ? "📚" : g.title === "Grocery" ? "🛒" : "💰";
-                return {
-                  title: g.title,
-                  current: Math.round(g.current),
-                  target,
-                  savings,
-                  description,
-                  icon,
-                };
-              })
-            : [
-                {
-                  title: "General Savings",
-                  current: 0,
-                  target: 0,
-                  savings: 0,
-                  description: "Spend mindfully this week",
-                  icon: "💰",
-                },
-              ];
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Based on your spending patterns, here are personalized savings goals I recommend for you:",
-            type: "savings-goals",
-            data: {
-              goals,
-            },
-          },
-        ]);
-      } else if (lowerMessage.includes("tree") || lowerMessage.includes("money tree")) {
-        const monthlyBudget = Number(import.meta.env.VITE_MONTHLY_BUDGET ?? 3000);
-        const spent = analysis?.totalSpent ?? 0;
-        const progress = Math.max(0, Math.min(100, Math.round((1 - spent / Math.max(1, monthlyBudget)) * 100)));
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Your Money Tree is thriving! 🌳",
-            type: "money-tree",
-            data: {
-              level: 4,
-              stage: "Young Sapling",
-              emoji: "🌱",
-              progress,
-              totalSaved: Math.max(0, Math.round(monthlyBudget - spent)),
-            },
-          },
-        ]);
-      } else if (
-        lowerMessage.includes("coupon") ||
-        lowerMessage.includes("campus") ||
-        lowerMessage.includes("resources") ||
-        lowerMessage.includes("daily insights") ||
-        lowerMessage.includes("daily-insights")
-      ) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Great choice! Here are personalized savings opportunities for you:",
-            type: "coupons",
-            data: {
-              coupons: [
-                {
-                  store: "Campus Dining Hall",
-                  discount: "Free meal",
-                  description: "Use your meal plan credits",
-                  category: "Food",
-                  savings: 12,
-                },
-                {
-                  store: "University Library",
-                  discount: "Free",
-                  description: "Textbook rental program",
-                  category: "Education",
-                  savings: 85,
-                },
-                {
-                  store: "Campus Gym",
-                  discount: "Free membership",
-                  description: "Included in student fees",
-                  category: "Health",
-                  savings: 50,
-                },
-              ],
-            },
-          },
-        ]);
-      } else if (lowerMessage.includes("impulse") || lowerMessage.includes("track") || lowerMessage.includes("spending")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Well done! I'm tracking your progress. You've avoided 3 impulse purchases this week and saved $127! Your spending habits are improving:\n\n✅ Waited 24hrs before purchases\n✅ Used the campus coffee shop\n✅ Packed lunch 4 times\n\nKeep up the great work! 🎉",
+            content: ai,
             type: "text",
           },
         ]);
-      } else if (lowerMessage.includes("free") || lowerMessage.includes("event")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Awesome! Attending free events is a smart way to have fun without spending. This month you've attended 5 free campus events and saved approximately $75 on entertainment! 🎉\n\nUpcoming free events:\n🎵 Friday concert at 7pm\n🎬 Movie night on Saturday\n🏃 Morning yoga classes",
-            type: "text",
-          },
-        ]);
-      } else if (lowerMessage.includes("health")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Great focus on wellness! Making healthy choices saves money too:\n\n💪 Used campus gym (free)\n🥗 Cooked meals instead of eating out\n🚶 Walked instead of rideshare\n\nYou've saved $180 this month while staying healthy! Your Money Tree loves healthy choices! 🌱",
-            type: "text",
-          },
-        ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "I'm here to help you make smart financial decisions! Try asking about:\n\n💰 Your budget tracking\n🌳 Money Tree progress\n🎯 Personalized savings goals\n🏷️ Campus resources and savings\n\nWhat would you like to explore?",
-            type: "text",
-          },
-        ]);
+        return;
+      } catch {
+        // If context call fails, fall back to plain model
       }
-
+      const result = await modelRef.current.generateContent(prompt);
+      // SDK returns a response object; text() produces final text
+      // @ts-ignore
+      const text = await result.response.text();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: text || "I couldn't find an answer. Try rephrasing your question.",
+          type: "text",
+        },
+      ]);
+    } catch (err: any) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            "I had trouble contacting Gemini. Please check your network and VITE_GEMINI_API_KEY, then try again.",
+          type: "text",
+        },
+      ]);
+    } finally {
       setIsTyping(false);
       setShowActions(true);
-    }, 1000);
+    }
+  };
+
+  // For now, route every request to Gemini
+  const simulateAIResponse = (userMessage: string) => {
+    askGemini(userMessage);
   };
 
   const handleSendMessage = () => {
@@ -277,22 +284,22 @@ export function NewChatScreen() {
     let message = "";
     switch (action) {
       case "stay-under-budget":
-        message = "Stay under budget";
+        message = "How can I stay under budget this month? Give concrete steps.";
         break;
       case "avoid-impulse-buys":
-        message = "Avoid impulse buys";
+        message = "Help me avoid impulse buys. Give tactics I can apply today.";
         break;
       case "attended-free-events":
-        message = "Attended free events";
+        message = "Suggest free campus events ideas and ways to have fun for $0.";
         break;
       case "tracked-spendings":
-        message = "Tracked spendings";
+        message = "What are good ways to track my spending as a Rutgers student?";
         break;
       case "healthy-choices":
-        message = "Healthy choices";
+        message = "How can I make healthy choices that also save money?";
         break;
       case "daily-insights":
-        message = "Daily insights";
+        message = "Give me daily financial insights tailored to a Rutgers student.";
         break;
     }
 
@@ -350,7 +357,10 @@ export function NewChatScreen() {
 
       {/* Manage Meal Plan Button */}
       <div className="p-4 bg-white border-t">
-        <Button className="w-full bg-[#FCD535] hover:bg-yellow-400 text-gray-900 h-12 gap-2 rounded-xl shadow-lg">
+        <Button
+          className="w-full bg-[#FCD535] hover:bg-yellow-400 text-gray-900 h-12 gap-2 rounded-xl shadow-lg"
+          onClick={() => setShowMealPlan(true)}
+        >
           <Utensils className="w-5 h-5" />
           Manage Meal Plan
         </Button>
@@ -376,6 +386,12 @@ export function NewChatScreen() {
           </Button>
         </div>
       </div>
+      {/* Meal Plan Modal */}
+      <Dialog open={showMealPlan} onOpenChange={setShowMealPlan}>
+        <DialogContent className="bg-white p-0 max-w-[420px] w-full">
+          <MealPlanScreen onClose={() => setShowMealPlan(false)} />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

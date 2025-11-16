@@ -4,12 +4,10 @@ import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { User, Bell, Shield, HelpCircle, Settings, ChevronRight, LogOut, CreditCard, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import { loadTransactionCSV, ParsedTransaction } from "../services/csvParser";
 
 type SettingItem = {
   icon?: React.ComponentType<any>;
@@ -31,24 +29,6 @@ export function ProfileScreen() {
   const savedCards = [
     { lastFour: "1234", type: "VISA", holder: "John Doe", expire: "12/25" },
   ];
-  const [showCardDialog, setShowCardDialog] = useState(false);
-  const [transactions, setTransactions] = useState<ParsedTransaction[]>([]);
-  const [loadingTx, setLoadingTx] = useState(false);
-
-  useEffect(() => {
-    // Preload transactions once for the profile
-    let mounted = true;
-    (async () => {
-      setLoadingTx(true);
-      const tx = await loadTransactionCSV("/final_wallet_transactions_sample.csv");
-      if (!mounted) return;
-      setTransactions(tx);
-      setLoadingTx(false);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const settingsSections: {
   title: string;
@@ -147,7 +127,7 @@ export function ProfileScreen() {
         
         {/* Saved Cards */}
         {savedCards.map((card, index) => (
-          <Card key={index} className="mb-3 p-4 bg-white cursor-pointer" onClick={() => setShowCardDialog(true)}>
+          <Card key={index} className="mb-3 p-4 bg-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -291,59 +271,6 @@ export function ProfileScreen() {
           </Card>
         )}
       </div>
-
-      {/* Card Details + Recent Transactions Dialog */}
-      <Dialog open={showCardDialog} onOpenChange={setShowCardDialog}>
-        <DialogContent className="bg-white">
-          <DialogHeader>
-            <DialogTitle>Card Details</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="p-4 rounded-lg border bg-white">
-              <div className="flex items-center gap-3 mb-1">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-900">VISA •••• 1234</p>
-                  <p className="text-xs text-gray-500">John Doe</p>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500">Expires 12/25</p>
-            </div>
-            <div className="mt-2">
-              <h4 className="text-sm text-gray-700 mb-2">Recent Transactions</h4>
-              <div className="max-h-64 overflow-y-auto rounded-lg border">
-                {loadingTx ? (
-                  <div className="p-4 text-sm text-gray-500">Loading...</div>
-                ) : (
-                  <div className="divide-y">
-                    {transactions
-                      .filter(t => t.payment_method === "Credit Card")
-                      .slice(-20)
-                      .reverse()
-                      .map((t) => (
-                        <div key={t.transaction_id} className="p-3 flex items-center justify-between">
-                          <div>
-                            <p className="text-sm text-gray-900">{t.merchant}</p>
-                            <p className="text-xs text-gray-500">{t.category} • {new Date(t.date).toLocaleDateString()}</p>
-                          </div>
-                          <p className="text-sm text-gray-900">${t.amount.toFixed(2)}</p>
-                        </div>
-                      ))}
-                    {transactions.filter(t => t.payment_method === "Credit Card").length === 0 && (
-                      <div className="p-4 text-sm text-gray-500">No credit card transactions found.</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11" onClick={() => setShowCardDialog(false)}>
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* App Info */}
       <Card className="mb-4 p-4 bg-white">

@@ -1,0 +1,100 @@
+transaction_id,user_id,merchant,category,amount,payment_method,location,date
+T0001,U001,Starbucks,Dining,5.75,Dining Dollars,Campus Center,2025-11-01
+T0002,U001,Campus Dining Hall,Dining,9.25,Meal Plan,Dining Hall,2025-11-02
+T0003,U001,Bookstore,Books,42.50,Campus Card,Bookstore,2025-11-03
+T0004,U002,Target,Supplies,28.99,Credit Card,Downtown Newark,2025-11-01
+T0005,U002,Local Pizzeria,Dining,14.25,Campus Card,Downtown Newark,2025-11-03
+T0006,U002,Streaming Service,Entertainment,9.99,Credit Card,Online,2025-11-05
+T0007,U003,Campus Dining Hall,Dining,8.50,Meal Plan,Dining Hall,2025-11-02
+T0008,U003,Gym Cafe,Dining,6.75,Campus Card,Rec Center,2025-11-04
+T0009,U003,Uber / Transit,Transport,12.40,Debit Card,Off-Campus,2025-11-06
+T0010,U004,CVS,Pharmacy,16.30,Credit Card,Downtown Newark,2025-11-01
+T0011,U004,Starbucks,Dining,4.95,Dining Dollars,Campus Center,2025-11-03
+T0012,U004,Campus Dining Hall,Dining,9.10,Meal Plan,Dining Hall,2025-11-07
+T0013,U005,Bookstore,Books,63.20,Campus Card,Bookstore,2025-11-02
+T0014,U005,Food Truck,Dining,7.80,Campus Card,Quad,2025-11-05
+T0015,U005,Local Pizzeria,Dining,13.50,Credit Card,Downtown Newark,2025-11-08
+T0016,U006,Starbucks,Dining,5.60,Dining Dollars,Campus Center,2025-11-03
+T0017,U006,Streaming Service,Entertainment,9.99,Debit Card,Online,2025-11-04
+T0018,U006,Campus Dining Hall,Dining,8.90,Meal Plan,Dining Hall,2025-11-06
+T0019,U007,Target,Supplies,35.40,Debit Card,Downtown Newark,2025-11-02
+T0020,U007,Local Pizzeria,Dining,11.75,Campus Card,Downtown Newark,2025-11-06
+T0021,U007,Uber / Transit,Transport,18.20,Credit Card,Off-Campus,2025-11-07
+T0022,U008,Bookstore,Books,24.99,Campus Card,Bookstore,2025-11-01
+T0023,U008,Starbucks,Dining,4.50,Dining Dollars,Campus Center,2025-11-02
+T0024,U008,Food Truck,Dining,8.25,Campus Card,Quad,2025-11-05
+T0025,U009,Campus Dining Hall,Dining,9.35,Meal Plan,Dining Hall,2025-11-03
+T0026,U009,Streaming Service,Entertainment,9.99,Credit Card,Online,2025-11-05
+T0027,U009,Target,Supplies,19.80,Debit Card,Downtown Newark,2025-11-07
+T0028,U010,Local Pizzeria,Dining,12.60,Campus Card,Downtown Newark,2025-11-02
+T0029,U010,Gym Cafe,Dining,5.95,Campus Card,Rec Center,2025-11-04
+T0030,U010,CVS,Pharmacy,13.10,Credit Card,Downtown Newark,2025-11-08
+T0031,U001,Uber / Transit,Transport,17.30,Credit Card,Off-Campus,2025-11-09
+T0032,U002,Campus Dining Hall,Dining,8.20,Meal Plan,Dining Hall,2025-11-09
+T0033,U003,Bookstore,Books,29.99,Campus Card,Bookstore,2025-11-09
+T0034,U004,Target,Supplies,22.45,Debit Card,Downtown Newark,2025-11-10
+T0035,U005,Starbucks,Dining,5.10,Dining Dollars,Campus Center,2025-11-10
+T0036,U006,Local Pizzeria,Dining,14.75,Credit Card,Downtown Newark,2025-11-11
+T0037,U007,Streaming Service,Entertainment,9.99,Credit Card,Online,2025-11-11
+T0038,U008,Campus Dining Hall,Dining,8.60,Meal Plan,Dining Hall,2025-11-11
+T0039,U009,Target,Supplies,31.25,Debit Card,Downtown Newark,2025-11-12
+T0040,U010,Starbucks,Dining,4.85,Dining Dollars,Campus Center,2025-11-12
+T0041,U001,Food Truck,Dining,7.25,Campus Card,Quad,2025-11-13
+T0042,U001,Campus Print Center,Services,3.50,Campus Card,Library,2025-11-14
+T0043,U001,JUICE Bar,Dining,6.10,Dining Dollars,Gym Lobby,2025-11-15
+T0044,U002,Whole Foods,Grocery,24.30,Debit Card,Downtown Newark,2025-11-13
+T0045,U002,Light Rail Pass,Transport,2.75,Credit Card,Transit Station,2025-11-14
+T0046,U002,QuickClean Laundry,Services,5.00,Campus Card,Residence Hall,2025-11-16
+T0047,U003,Movie Theater,Entertainment,12.00,Debit Card,Off-Campus,2025-11-13
+T0048,U003,Smoothie Spot,Dining,5.90,Campus Card,Campus Center,2025-11-15
+T0049,U003,Campus Print Center,Services,2.25,Campus Card,Library,2025-11-17
+T0050,U004,Trader Joe’s,Grocery,18.40,Credit Card,Off-Campus,2025-11-14
+T0051,U004,Gym Cafe,Dining,7.20,Campus Card,Rec Center,2025-11-15
+T0052,U004,Light Rail Pass,Transport,2.75,Debit Card,Transit Station,2025-11-17
+T0053,U005,Campus Market,Grocery,9.60,Campus Card,Campus Center,2025-11-13
+T0054,U005,Food Truck,Dining,8.40,Campus Card,Quad,2025-11-16
+T0055,U005,Campus Print Center,Services,1.95,Campus Card,Library,2025-11-18
+T0056,U006,Pharmacy Plus,Pharmacy,11.25,Credit Card,Downtown Newark,2025-11-14
+T0057,U006,Sushi Corner,Dining,13.50,Credit Card,Off-Campus,2025-11-16
+T0058,U006,Gym Shop,Merchandise,9.80,Campus Card,Rec Center,2025-11-18
+T0059,U007,Local Cafe,Dining,6.95,Debit Card,Downtown Newark,2025-11-13
+T0060,U007,Bookstore,Books,15.99,Campus Card,Bookstore,2025-11-15
+T0061,U007,Parking Garage,Transport,4.00,Debit Card,Campus Parking,2025-11-18
+T0062,U008,Campus Market,Grocery,7.80,Campus Card,Campus Center,2025-11-14
+T0063,U008,Food Truck,Dining,9.10,Campus Card,Quad,2025-11-16
+T0064,U008,Movie Theater,Entertainment,11.50,Credit Card,Off-Campus,2025-11-19
+T0065,U009,Campus Print Center,Services,2.75,Campus Card,Library,2025-11-15
+T0066,U009,Starbucks,Dining,5.45,Dining Dollars,Campus Center,2025-11-17
+T0067,U009,Light Rail Pass,Transport,2.75,Debit Card,Transit Station,2025-11-19
+T0068,U010,Whole Foods,Grocery,21.80,Credit Card,Off-Campus,2025-11-14
+T0069,U010,Gym Cafe,Dining,6.40,Campus Card,Rec Center,2025-11-16
+T0070,U010,QuickClean Laundry,Services,4.50,Campus Card,Residence Hall,2025-11-19
+T0071,U001,Campus Dining Hall,Dining,9.00,Meal Plan,Dining Hall,2025-11-16
+T0072,U001,Rec Center Store,Merchandise,12.75,Campus Card,Rec Center,2025-11-18
+T0073,U001,Local Bakery,Dining,4.80,Debit Card,Downtown Newark,2025-11-19
+T0074,U002,Campus Market,Grocery,10.20,Campus Card,Campus Center,2025-11-17
+T0075,U002,Uber / Transit,Transport,14.30,Credit Card,Off-Campus,2025-11-18
+T0076,U002,Pharmacy Plus,Pharmacy,9.15,Debit Card,Downtown Newark,2025-11-20
+T0077,U003,Sushi Corner,Dining,12.90,Credit Card,Off-Campus,2025-11-17
+T0078,U003,Campus Dining Hall,Dining,8.75,Meal Plan,Dining Hall,2025-11-18
+T0079,U003,Campus Market,Grocery,6.95,Campus Card,Campus Center,2025-11-20
+T0080,U004,Light Rail Pass,Transport,2.75,Credit Card,Transit Station,2025-11-16
+T0081,U004,Local Bakery,Dining,5.25,Debit Card,Downtown Newark,2025-11-18
+T0082,U004,QuickClean Laundry,Services,4.75,Campus Card,Residence Hall,2025-11-20
+T0083,U005,JUICE Bar,Dining,6.20,Dining Dollars,Gym Lobby,2025-11-17
+T0084,U005,Campus Print Center,Services,2.50,Campus Card,Library,2025-11-19
+T0085,U005,Movie Theater,Entertainment,12.25,Debit Card,Off-Campus,2025-11-20
+T0086,U006,Campus Dining Hall,Dining,9.15,Meal Plan,Dining Hall,2025-11-17
+T0087,U006,Local Cafe,Dining,7.25,Credit Card,Downtown Newark,2025-11-19
+T0088,U006,Campus Market,Grocery,8.10,Campus Card,Campus Center,2025-11-20
+T0089,U007,Gym Shop,Merchandise,10.50,Campus Card,Rec Center,2025-11-17
+T0090,U007,Pharmacy Plus,Pharmacy,13.40,Debit Card,Downtown Newark,2025-11-19
+T0091,U007,Food Truck,Dining,8.60,Campus Card,Quad,2025-11-20
+T0092,U008,Trader Joe’s,Grocery,19.75,Credit Card,Off-Campus,2025-11-17
+T0093,U008,Campus Print Center,Services,3.10,Campus Card,Library,2025-11-19
+T0094,U008,JUICE Bar,Dining,6.05,Dining Dollars,Gym Lobby,2025-11-20
+T0095,U009,Gym Cafe,Dining,7.35,Campus Card,Rec Center,2025-11-17
+T0096,U009,Local Bakery,Dining,4.95,Debit Card,Downtown Newark,2025-11-19
+T0097,U009,Parking Garage,Transport,3.50,Credit Card,Campus Parking,2025-11-20
+T0098,U010,Campus Market,Grocery,11.40,Campus Card,Campus Center,2025-11-17
+T0099,U010,Sushi Corner,Dining,14.10,Credit Card,Off-Campus,2025-11-19
