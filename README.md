@@ -5,7 +5,7 @@
   
   ### Option 1: Live Demo
   Access the app directly in your browser:
-  - **URL**: http://172.27.122.44:3000/
+  - **URL**: http://10.75.207.58:3000/
   - Works on desktop and mobile browsers
   
   ### Option 2: Run Locally
